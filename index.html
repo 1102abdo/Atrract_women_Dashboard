@@ -1,118 +1,148 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<title>PDF Dashboard</title>
+  <meta charset="UTF-8">
+  <title>PDF Dashboard</title>
 
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
-<style>
-body {
-  background:#0d1117;
-  color:#cfe0fc;
-}
-.btn-cyan {
-  background:#0ea5e9;
-  color:#fff;
-}
-.btn-cyan:hover { background:#0284c7; }
-.table th,.table td { color:#fff; }
-</style>
+  <style>
+    body {
+      background: #0d1117;
+      color: #cfe0fc;
+    }
+
+    .btn-cyan {
+      background: #0ea5e9;
+      color: #fff;
+    }
+
+    .btn-cyan:hover {
+      background: #0284c7;
+    }
+
+    .table th,
+    .table td {
+      color: #fff;
+    }
+  </style>
 </head>
 
 <body>
-<div class="container py-4">
+  <div class="container py-4">
 
-<h2 class="text-info mb-3">PDF Dashboard</h2>
+    <h2 class="text-info mb-3">PDF Dashboard</h2>
 
-<button class="btn btn-cyan mb-3" onclick="signIn()">Login with Google</button>
+    <button class="btn btn-cyan mb-3" onclick="login()">Login with Google</button>
 
-<table class="table table-dark">
-<thead>
-<tr>
-<th>#</th><th>File Name</th><th>Action</th>
-</tr>
-</thead>
-<tbody id="filesList"></tbody>
-</table>
+    <table class="table table-dark">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>File Name</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="filesList"></tbody>
+    </table>
 
-<div class="card bg-dark text-light">
-<div class="card-body">
-<h5 class="text-info">Upload New PDF</h5>
-<input type="file" id="pdfFile" class="form-control mb-2" accept="application/pdf">
-<button class="btn btn-cyan" onclick="uploadFile()">Upload</button>
-</div>
-</div>
+    <div class="card bg-dark text-light">
+      <div class="card-body">
+        <h5 class="text-info">Upload New PDF</h5>
+        <input type="file" id="pdfFile" class="form-control mb-2" accept="application/pdf">
+        <button class="btn btn-cyan" onclick="uploadFile()">Upload</button>
+      </div>
+    </div>
 
-</div>
+  </div>
 
-<script src="https://apis.google.com/js/api.js"></script>
+  <!-- Google scripts -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://apis.google.com/js/api.js"></script>
 
-<script>
-const CLIENT_ID = "885286334089-al0gu7ep5pcu9k4ffna30rgtqld36896.apps.googleusercontent.com";
-const API_KEY = "";
-const FOLDER_ID = "1n3Z8bDOuaC7fSzsv7eSEbCLHfyruc-nc";
-const SCOPES = "https://www.googleapis.com/auth/drive";
+  <script>
+    const CLIENT_ID = "885286334089-al0gu7ep5pcu9k4ffna30rgtqld36896.apps.googleusercontent.com";
+    const FOLDER_ID = "1n3Z8bDOuaC7fSzsv7eSEbCLHfyruc-nc";
+    const SCOPES = "https://www.googleapis.com/auth/drive";
 
-function loadClient() {
-  gapi.client.init({
-    apiKey: API_KEY,
-    clientId: CLIENT_ID,
-    scope: SCOPES,
-    discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"]
-  });
-}
+    let accessToken = null;
 
-gapi.load("client:auth2", loadClient);
+    function initGapi() {
+      gapi.load("client", async () => {
+        await gapi.client.init({
+          discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"]
+        });
+      });
+    }
+    window.onload = initGapi;
 
-function signIn() {
-  gapi.auth2.getAuthInstance().signIn().then(listFiles);
-}
+    function login() {
+      const tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: (resp) => {
+          accessToken = resp.access_token;
+          gapi.client.setToken({ access_token: accessToken });
+          listFiles();
+        }
+      });
+      tokenClient.requestAccessToken();
+    }
 
-function listFiles() {
-  gapi.client.drive.files.list({
-    q: `'${FOLDER_ID}' in parents and mimeType='application/pdf'`,
-    fields: "files(id,name)"
-  }).then(res=>{
-    const body=document.getElementById("filesList");
-    body.innerHTML="";
-    res.result.files.forEach((f,i)=>{
-      body.innerHTML+=`
+    function listFiles() {
+      gapi.client.drive.files.list({
+        q: `'${FOLDER_ID}' in parents and mimeType='application/pdf'`,
+        fields: "files(id,name)"
+      }).then(res => {
+        const body = document.getElementById("filesList");
+        body.innerHTML = "";
+        res.result.files.forEach((f, i) => {
+          body.innerHTML += `
       <tr>
-      <td>${i+1}</td>
-      <td><a target="_blank" href="https://drive.google.com/uc?id=${f.id}">${f.name}</a></td>
-      <td><button class="btn btn-danger btn-sm" onclick="deleteFile('${f.id}')">Delete</button></td>
+        <td>${i + 1}</td>
+        <td>
+          <a class="text-info" target="_blank"
+             href="https://drive.google.com/file/d/${f.id}/view">
+             ${f.name}
+          </a>
+        </td>
+        <td>
+          <button class="btn btn-danger btn-sm"
+            onclick="deleteFile('${f.id}')">Delete</button>
+        </td>
       </tr>`;
-    });
-  });
-}
+        });
+      });
+    }
 
-function uploadFile(){
-  const file=document.getElementById("pdfFile").files[0];
-  if(!file)return alert("Choose PDF");
+    function uploadFile() {
+      const file = document.getElementById("pdfFile").files[0];
+      if (!file) return alert("Choose PDF");
 
-  const metadata={
-    name:file.name,
-    parents:[FOLDER_ID]
-  };
+      const metadata = { name: file.name, parents: [FOLDER_ID] };
 
-  const form=new FormData();
-  form.append("metadata",new Blob([JSON.stringify(metadata)],{type:"application/json"}));
-  form.append("file",file);
+      const form = new FormData();
+      form.append("metadata",
+        new Blob([JSON.stringify(metadata)], { type: "application/json" })
+      );
+      form.append("file", file);
 
-  fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{
-    method:"POST",
-    headers:{
-      Authorization:"Bearer "+gapi.auth.getToken().access_token
-    },
-    body:form
-  }).then(()=>listFiles());
-}
+      fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + accessToken },
+        body: form
+      }).then(() => listFiles());
+    }
 
-function deleteFile(id){
-  gapi.client.drive.files.delete({fileId:id}).then(listFiles);
-}
-</script>
+    function deleteFile(id) {
+      fetch(`https://www.googleapis.com/drive/v3/files/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: "Bearer " + accessToken }
+      }).then(() => listFiles());
+    }
+  </script>
 
 </body>
+
 </html>
